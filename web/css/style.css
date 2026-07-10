@@ -1,0 +1,88 @@
+@font-face {
+  font-family: 'PressStart2P';
+  src: url('../assets/fonts/PressStart2P.woff2') format('woff2');
+  font-display: swap;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+canvas {
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 8px;
+  border-radius: 6px;
+  font-family: sans-serif;
+  transition: opacity 0.3s;
+}
+
+#hud button {
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+#hud-status {
+  color: #fff;
+  font-size: 13px;
+  margin-right: 4px;
+}
+
+#hud.hud-collapsed {
+  opacity: 0.15;
+}
+
+#hud.hud-collapsed:hover {
+  opacity: 1;
+}
+
+#debug-panel {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.6);
+  color: #0f0;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre;
+  padding: 6px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+#gamepad-debug-panel {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.6);
+  color: #0ff;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre;
+  padding: 6px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  max-width: 40vw;
+}
