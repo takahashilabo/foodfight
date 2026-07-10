@@ -18,17 +18,26 @@ function applyDeadzone(v) {
 }
 
 // Joy-Cons here are held sideways (each one used as its own single
-// controller), not upright -- so the stick's raw X/Y axes need a 90°
-// rotation to turn "physical up on the sideways-held controller" into
-// "forward". The L and R Joy-Cons are mirror images of each other when
-// held sideways (SL/SR at the top for both), so they rotate in opposite
-// directions. BEST GUESS pending real-hardware confirmation -- if forward/
-// back or left/right come out swapped or reversed, flip these two lines.
+// controller), not upright.
+//
+// Originally this applied an extra 90° software rotation on top of the
+// raw stick axes, on the assumption that the raw axes were calibrated for
+// upright (console-attached) holding. Real-hardware testing showed this
+// was wrong: with the rotation applied, the controls behaved as if the
+// Joy-Con were held upright even though it was physically held sideways.
+// Root cause: a lone Joy-Con's raw stick axes are themselves already
+// calibrated relative to sideways holding (that's Nintendo's own
+// single-Joy-Con reference orientation -- SL/SR act as shoulder buttons
+// along the top edge). So the extra rotation here was double-rotating.
+// Fixed by making this an identity passthrough. If left/right or
+// forward/back ever come out swapped again on new hardware, use the
+// gamepad debug panel's live axes + computed wheel-speed readout to
+// re-derive the correct mapping rather than guessing blind.
 function rotateForSidewaysL(x, y) {
-  return [-y, x]; // 90° clockwise
+  return [x, y];
 }
 function rotateForSidewaysR(x, y) {
-  return [y, -x]; // 90° counter-clockwise (mirrored)
+  return [x, y];
 }
 
 // x/y are raw stick axis values (-1..1) after the sideways rotation above.
@@ -74,15 +83,27 @@ export function gamepadCubeWheelSpeeds() {
   return [cube1, cube2];
 }
 
-// Debug info for the on-screen overlay: id, axes, and which buttons are
-// currently pressed, per connected gamepad.
+// Debug info for the on-screen overlay: id, mapping, axes, and which
+// buttons are currently pressed, per connected gamepad. `mapping` matters
+// for diagnosing axis-order issues: 'standard' means Chrome already
+// reindexed axes/buttons to the STANDARD_GAMEPAD layout; '' (empty) means
+// raw HID axis order, which can vary by OS/pairing.
 export function getGamepadDebugInfo() {
   return getConnectedGamepads().map((gp) => ({
     index: gp.index,
     id: gp.id,
+    mapping: gp.mapping || '(raw)',
     axes: gp.axes.map((a) => a.toFixed(2)),
     pressedButtons: gp.buttons
       .map((b, i) => (b.pressed ? i : null))
       .filter((i) => i !== null),
   }));
+}
+
+// Same as gamepadCubeWheelSpeeds() but also returns whichever intermediate
+// values are useful for live on-site debugging (rotated stick x/y, before
+// deadzone/scale). Used only by the debug panel.
+export function getGamepadCubeDebugSpeeds() {
+  const [cube1, cube2] = gamepadCubeWheelSpeeds();
+  return { cube1, cube2 };
 }

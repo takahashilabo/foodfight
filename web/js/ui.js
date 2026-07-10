@@ -4,7 +4,7 @@
 import { connectCube, onToioStatusChange, toioState } from './toio.js';
 import { unlockAudio } from './sound.js';
 import { requestFullscreenOnProjector } from './display.js';
-import { getGamepadDebugInfo } from './gamepad.js';
+import { getGamepadDebugInfo, getGamepadCubeDebugSpeeds } from './gamepad.js';
 import {
   exportWarpBackup, exportFoodBackup, importWarpBackup, importFoodBackup,
 } from './storage.js';
@@ -115,9 +115,11 @@ function setupGamepadDebugPanel() {
       panel.textContent = 'Gamepad: (未接続 -- Joy-Conのボタンを一度押すと認識されます)';
       return;
     }
-    panel.textContent = pads
-      .map((p) => `#${p.index} ${p.id}\n  axes: [${p.axes.join(', ')}]\n  pressed: [${p.pressedButtons.join(', ')}]`)
+    const { cube1, cube2 } = getGamepadCubeDebugSpeeds();
+    const padLines = pads
+      .map((p) => `#${p.index} ${p.id}\n  mapping: ${p.mapping}\n  axes: [${p.axes.join(', ')}]\n  pressed: [${p.pressedButtons.join(', ')}]`)
       .join('\n');
+    panel.textContent = `${padLines}\ncube1 wheels(L,R): [${cube1.join(', ')}]\ncube2 wheels(L,R): [${cube2.join(', ')}]`;
   }, 200);
 }
 
