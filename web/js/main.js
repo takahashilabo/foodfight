@@ -262,26 +262,27 @@ function collision() {
   const t2 = wm.warp(toioState.x2, toioState.y2);
   for (let i = foodList.length - 1; i >= 0; i--) {
     const f = foodList[i];
-    if (dist(f.pos.x, f.pos.y, t1.x, t1.y) < HIT_RADIUS) {
-      playHitSound();
-      pgl.push(new PG(f.pos.x, f.pos.y, 100, 30, 20, color(255, 0, 255)));
-      foodRemove(i);
-      score[0]++;
-      if (foodList.length === 0) {
-        playGameClearSound();
-        initResult();
-      }
-      continue;
-    }
-    if (dist(f.pos.x, f.pos.y, t2.x, t2.y) < HIT_RADIUS) {
-      playHitSound();
-      pgl.push(new PG(f.pos.x, f.pos.y, 100, 30, 20, color(0, 255, 0)));
-      foodRemove(i);
-      score[1]++;
-      if (foodList.length === 0) {
-        playGameClearSound();
-        initResult();
-      }
+    const d1 = dist(f.pos.x, f.pos.y, t1.x, t1.y);
+    const d2 = dist(f.pos.x, f.pos.y, t2.x, t2.y);
+    const hit1 = d1 < HIT_RADIUS;
+    const hit2 = d2 < HIT_RADIUS;
+    if (!hit1 && !hit2) continue;
+
+    // HIT_RADIUS is large relative to the mat, so both cubes are often
+    // simultaneously in range of the same food during real play. Whichever
+    // cube is actually closer wins, rather than always favoring cube1 by
+    // check order (that used to make cube1/pink win almost every contested
+    // hit regardless of which cube's player actually got there first).
+    const winner = hit1 && hit2 ? (d1 <= d2 ? 1 : 2) : (hit1 ? 1 : 2);
+
+    playHitSound();
+    const col = winner === 1 ? color(255, 0, 255) : color(0, 255, 0);
+    pgl.push(new PG(f.pos.x, f.pos.y, 100, 30, 20, col));
+    foodRemove(i);
+    score[winner - 1]++;
+    if (foodList.length === 0) {
+      playGameClearSound();
+      initResult();
     }
   }
 }
