@@ -264,8 +264,16 @@ function collision() {
     const f = foodList[i];
     const d1 = dist(f.pos.x, f.pos.y, t1.x, t1.y);
     const d2 = dist(f.pos.x, f.pos.y, t2.x, t2.y);
-    const hit1 = d1 < HIT_RADIUS;
-    const hit2 = d2 < HIT_RADIUS;
+    // A cube that's currently off the mat (lifted/tilted, Position ID
+    // "missed") has its x/y frozen at its last known reading rather than
+    // snapping to (0,0) -- see toio.js handleNotification(). That frozen
+    // "ghost" position must not count for collisions, or a cube that loses
+    // tracking near the middle of the play area becomes a stationary
+    // phantom that keeps stealing hits from the other, actively-moving
+    // cube (it can easily be "closer" to a food than the cube that's
+    // actually there).
+    const hit1 = toioState.onMat1 && d1 < HIT_RADIUS;
+    const hit2 = toioState.onMat2 && d2 < HIT_RADIUS;
     if (!hit1 && !hit2) continue;
 
     // HIT_RADIUS is large relative to the mat, so both cubes are often
