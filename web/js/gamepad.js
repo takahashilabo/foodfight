@@ -20,24 +20,26 @@ function applyDeadzone(v) {
 // Joy-Cons here are held sideways (each one used as its own single
 // controller), not upright.
 //
-// Originally this applied an extra 90° software rotation on top of the
-// raw stick axes, on the assumption that the raw axes were calibrated for
-// upright (console-attached) holding. Real-hardware testing showed this
-// was wrong: with the rotation applied, the controls behaved as if the
-// Joy-Con were held upright even though it was physically held sideways.
-// Root cause: a lone Joy-Con's raw stick axes are themselves already
-// calibrated relative to sideways holding (that's Nintendo's own
-// single-Joy-Con reference orientation -- SL/SR act as shoulder buttons
-// along the top edge). So the extra rotation here was double-rotating.
-// Fixed by making this an identity passthrough. If left/right or
-// forward/back ever come out swapped again on new hardware, use the
-// gamepad debug panel's live axes + computed wheel-speed readout to
-// re-derive the correct mapping rather than guessing blind.
+// This has been guessed wrong twice before (a manual 90° rotation, then an
+// identity passthrough) because axis behavior isn't consistent across
+// machines/pairings. Fixed this time from actual measured data (combined
+// Joy-Con (L/R) gamepad, left stick = cube1's axes[0,1]) read off the
+// on-screen gamepad debug panel:
+//   neutral:              axes = [0, 0, ...]
+//   stick pushed forward: axes = [1, 0, ...]  (physical forward -> raw X)
+//   stick pushed right:   axes = [0, 1, ...]  (physical right-turn -> raw Y)
+// i.e. forward/turn come out on the raw axes with X and Y swapped relative
+// to what stickToWheelSpeeds() expects (y=forward, x=turn). Swapping them
+// back fixes it for the L stick (cube1). R stick (cube2) not yet
+// separately measured -- if cube2 is still wrong, re-run the same
+// forward/right-turn test on that stick via the debug panel rather than
+// guessing, since L and R Joy-Con are physical mirror images and may not
+// share the same correction.
 function rotateForSidewaysL(x, y) {
-  return [x, y];
+  return [y, x];
 }
 function rotateForSidewaysR(x, y) {
-  return [x, y];
+  return [x, y]; // TODO: unverified for the R stick -- see comment above.
 }
 
 // x/y are raw stick axis values (-1..1) after the sideways rotation above.
@@ -54,18 +56,60 @@ export function getConnectedGamepads() {
   return Array.from(pads).filter((p) => p !== null);
 }
 
+// Button-based up/down/left/right, as a more predictable alternative to the
+// analog stick while its axis orientation is still being worked out.
+//
+// Joy-Con L has a physical D-pad (up/down/left/right) in addition to its
+// stick; Joy-Con R has no D-pad but has A/B/X/Y face buttons in the same
+// diamond position. Under Chromium's STANDARD_GAMEPAD mapping:
+//  - D-pad: 12=up, 13=down, 14=left, 15=right.
+//  - Face-button cluster: 0=bottom, 1=right, 2=left, 3=top (by physical
+//    position, per the Gamepad API spec's remapping convention).
+// BEST GUESS pending real-hardware confirmation -- the gamepad debug panel
+// shows `pressed: [...]` with the raw index of whichever button you just
+// pressed, so if a direction is wrong, press that physical button and
+// read off its real index there.
+const DPAD_BUTTONS = { up: 12, down: 13, left: 14, right: 15 };
+const FACE_BUTTONS = { up: 3, down: 0, left: 2, right: 1 };
+
+function isPressed(gp, index) {
+  return !!(gp.buttons[index] && gp.buttons[index].pressed);
+}
+
+function buttonWheelSpeeds(gp, buttonMap) {
+  if (!gp) return [0, 0];
+  let left = 0;
+  let right = 0;
+  if (isPressed(gp, buttonMap.up)) { left += RADICON_FORWARD_SPEED; right += RADICON_FORWARD_SPEED; }
+  if (isPressed(gp, buttonMap.down)) { left -= RADICON_FORWARD_SPEED; right -= RADICON_FORWARD_SPEED; }
+  if (isPressed(gp, buttonMap.left)) { left -= RADICON_TURN_SPEED; right += RADICON_TURN_SPEED; }
+  if (isPressed(gp, buttonMap.right)) { left += RADICON_TURN_SPEED; right -= RADICON_TURN_SPEED; }
+  return [left, right];
+}
+
+function addSpeeds(a, b) {
+  return [
+    Math.max(-255, Math.min(255, a[0] + b[0])),
+    Math.max(-255, Math.min(255, a[1] + b[1])),
+  ];
+}
+
 // Returns [cube1WheelSpeeds, cube2WheelSpeeds] from whatever gamepad(s) are
-// currently connected, handling both the combined and separate pairing cases.
+// currently connected, handling both the combined and separate pairing
+// cases, and combining stick + D-pad/face-button input for each cube.
 export function gamepadCubeWheelSpeeds() {
   const pads = getConnectedGamepads();
   if (pads.length === 0) return [[0, 0], [0, 0]];
 
   if (pads.length === 1 && pads[0].axes.length >= 4) {
-    // Single combined Joy-Con (L/R) gamepad: left stick (L) -> cube1, right stick (R) -> cube2.
+    // Single combined Joy-Con (L/R) gamepad: L (stick + D-pad) -> cube1,
+    // R (stick + face buttons) -> cube2.
     const gp = pads[0];
     const [x1, y1] = rotateForSidewaysL(gp.axes[0], gp.axes[1]);
     const [x2, y2] = rotateForSidewaysR(gp.axes[2], gp.axes[3]);
-    return [stickToWheelSpeeds(x1, y1), stickToWheelSpeeds(x2, y2)];
+    const cube1 = addSpeeds(stickToWheelSpeeds(x1, y1), buttonWheelSpeeds(gp, DPAD_BUTTONS));
+    const cube2 = addSpeeds(stickToWheelSpeeds(x2, y2), buttonWheelSpeeds(gp, FACE_BUTTONS));
+    return [cube1, cube2];
   }
 
   // Two separate gamepads (individually-paired Joy-Cons, or anything else):
@@ -74,11 +118,11 @@ export function gamepadCubeWheelSpeeds() {
   let cube2 = [0, 0];
   if (pads[0]) {
     const [x, y] = rotateForSidewaysL(pads[0].axes[0] || 0, pads[0].axes[1] || 0);
-    cube1 = stickToWheelSpeeds(x, y);
+    cube1 = addSpeeds(stickToWheelSpeeds(x, y), buttonWheelSpeeds(pads[0], DPAD_BUTTONS));
   }
   if (pads[1]) {
     const [x, y] = rotateForSidewaysR(pads[1].axes[0] || 0, pads[1].axes[1] || 0);
-    cube2 = stickToWheelSpeeds(x, y);
+    cube2 = addSpeeds(stickToWheelSpeeds(x, y), buttonWheelSpeeds(pads[1], FACE_BUTTONS));
   }
   return [cube1, cube2];
 }
