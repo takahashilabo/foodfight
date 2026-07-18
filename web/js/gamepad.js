@@ -49,7 +49,11 @@ function rotateForSidewaysR(x, y) {
 // x/y are raw stick axis values (-1..1) after the sideways rotation above.
 function stickToWheelSpeeds(x, y) {
   const forward = applyDeadzone(y) * RADICON_FORWARD_SPEED;
-  const turn = applyDeadzone(x) * RADICON_TURN_SPEED;
+  // Negated: with the measured L/R rotations above, +x meant "turn right"
+  // by this function's own left/right-wheel convention, but real-hardware
+  // testing showed turning came out reversed on both cubes despite forward/
+  // back being correct -- i.e. the rotations are right, this sign was not.
+  const turn = -applyDeadzone(x) * RADICON_TURN_SPEED;
   const left = Math.max(-255, Math.min(255, forward - turn));
   const right = Math.max(-255, Math.min(255, forward + turn));
   return [left, right];
