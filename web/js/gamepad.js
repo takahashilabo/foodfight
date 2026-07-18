@@ -23,23 +23,27 @@ function applyDeadzone(v) {
 // This has been guessed wrong twice before (a manual 90° rotation, then an
 // identity passthrough) because axis behavior isn't consistent across
 // machines/pairings. Fixed this time from actual measured data (combined
-// Joy-Con (L/R) gamepad, left stick = cube1's axes[0,1]) read off the
-// on-screen gamepad debug panel:
-//   neutral:              axes = [0, 0, ...]
-//   stick pushed forward: axes = [1, 0, ...]  (physical forward -> raw X)
-//   stick pushed right:   axes = [0, 1, ...]  (physical right-turn -> raw Y)
-// i.e. forward/turn come out on the raw axes with X and Y swapped relative
-// to what stickToWheelSpeeds() expects (y=forward, x=turn). Swapping them
-// back fixes it for the L stick (cube1). R stick (cube2) not yet
-// separately measured -- if cube2 is still wrong, re-run the same
-// forward/right-turn test on that stick via the debug panel rather than
-// guessing, since L and R Joy-Con are physical mirror images and may not
-// share the same correction.
+// Joy-Con (L/R) gamepad) read off the on-screen gamepad debug panel:
+//
+// L stick (cube1, axes[0,1]):
+//   stick pushed forward:   axes = [ 1,  0]
+//   stick pushed for right-turn: axes = [ 0,  1]
+//   => rotateForSidewaysL(x,y) = [y, x]
+//
+// R stick (cube2, axes[2,3]):
+//   stick pushed forward:   axes = [-1,  0]
+//   stick pushed for right-turn: axes = [ 0, -1]
+//   => rotateForSidewaysR(x,y) = [-y, -x]
+//
+// L and R come out as sign-flipped mirrors of each other, consistent with
+// Joy-Con L/R being physical mirror-image hardware. If either is ever
+// wrong again on new hardware, re-measure with the debug panel rather
+// than guessing -- see git history for the derivation method.
 function rotateForSidewaysL(x, y) {
   return [y, x];
 }
 function rotateForSidewaysR(x, y) {
-  return [x, y]; // TODO: unverified for the R stick -- see comment above.
+  return [-y, -x];
 }
 
 // x/y are raw stick axis values (-1..1) after the sideways rotation above.
